@@ -464,6 +464,8 @@ def generate_c_code_nls_cost(model: AcadosModel, stage_type, opts):
         middle_name = '_cost_y_e'
         u = symbol('u', 0, 0)
         y_expr = model.cost_y_expr_e
+        if y_expr == None:
+            return
 
     elif stage_type == 'initial':
         middle_name = '_cost_y_0'

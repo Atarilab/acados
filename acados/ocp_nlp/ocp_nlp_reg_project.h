@@ -87,6 +87,8 @@ typedef struct
     double *V; // TODO move to workspace
     double *d; // TODO move to workspace
     double *e; // TODO move to workspace
+    int nuxM;
+    int nuxM2;
 
     // giaf's
     struct blasfeo_dmat **RSQrq;  // pointer to RSQrq in qp_in

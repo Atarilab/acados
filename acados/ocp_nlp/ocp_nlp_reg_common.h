@@ -44,7 +44,11 @@ extern "C" {
 
 #include "acados/ocp_qp/ocp_qp_common.h"
 
-
+#ifdef ACADOS_WITH_OPENMP
+    #define REG_THREADS (ACADOS_NUM_THREADS)
+#else
+    #define REG_THREADS (1)
+#endif
 
 /* dims */
 

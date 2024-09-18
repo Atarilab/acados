@@ -116,9 +116,9 @@ acados_size_t ocp_nlp_reg_project_memory_calculate_size(void *config_, ocp_nlp_r
 
     size += sizeof(ocp_nlp_reg_project_memory);
 
-    size += nuxM*nuxM*sizeof(double);  // reg_hess
-    size += nuxM*nuxM*sizeof(double);  // V
-    size += 2*nuxM*sizeof(double);     // d e
+    size += REG_THREADS*nuxM*nuxM*sizeof(double);  // reg_hess
+    size += REG_THREADS*nuxM*nuxM*sizeof(double);  // V
+    size += REG_THREADS*2*nuxM*sizeof(double);     // d e
     size += (N+1)*sizeof(struct blasfeo_dmat *); // RSQrq
 
     return size;
@@ -146,19 +146,22 @@ void *ocp_nlp_reg_project_memory_assign(void *config_, ocp_nlp_reg_dims *dims, v
     c_ptr += sizeof(ocp_nlp_reg_project_memory);
 
     mem->reg_hess = (double *) c_ptr;
-    c_ptr += nuxM*nuxM*sizeof(double);  // reg_hess
+    c_ptr += REG_THREADS*nuxM*nuxM*sizeof(double);  // reg_hess
 
     mem->V = (double *) c_ptr;
-    c_ptr += nuxM*nuxM*sizeof(double);  // V
+    c_ptr += REG_THREADS*nuxM*nuxM*sizeof(double);  // V
 
     mem->d = (double *) c_ptr;
-    c_ptr += nuxM*sizeof(double); // d
+    c_ptr += REG_THREADS*nuxM*sizeof(double); // d
 
     mem->e = (double *) c_ptr;
-    c_ptr += nuxM*sizeof(double); // e
+    c_ptr += REG_THREADS*nuxM*sizeof(double); // e
 
     mem->RSQrq = (struct blasfeo_dmat **) c_ptr;
     c_ptr += (N+1)*sizeof(struct blasfeo_dmat *); // RSQrq
+
+    mem->nuxM = nuxM;
+    mem->nuxM2 = nuxM*nuxM;
 
     assert((char *) mem + ocp_nlp_reg_project_memory_calculate_size(config_, dims, opts_) >= c_ptr);
 
@@ -277,15 +280,28 @@ void ocp_nlp_reg_project_regularize(void *config, ocp_nlp_reg_dims *dims, void *
     int *nx = dims->nx;
     int *nu = dims->nu;
 
+#if defined(ACADOS_WITH_OPENMP)
+    #pragma omp parallel for
+#endif
     for(ii=0; ii<=dims->N; ii++)
     {
         // make symmetric
         blasfeo_dtrtr_l(nu[ii]+nx[ii], mem->RSQrq[ii], 0, 0, mem->RSQrq[ii], 0, 0);
 
         // regularize
+// #define ACADOS_WITH_OPENMP
+#ifdef ACADOS_WITH_OPENMP
+        int tid = omp_get_thread_num();
+        int idx = mem->nuxM * tid;
+        int idx2 = mem->nuxM2 * tid;
+        blasfeo_unpack_dmat(nu[ii]+nx[ii], nu[ii]+nx[ii], mem->RSQrq[ii], 0, 0, mem->reg_hess+idx2, nu[ii]+nx[ii]);
+        acados_project(nu[ii]+nx[ii], mem->reg_hess+idx2, mem->V+idx2, mem->d+idx, mem->e+idx, opts->epsilon);
+        blasfeo_pack_dmat(nu[ii]+nx[ii], nu[ii]+nx[ii], mem->reg_hess+idx2, nu[ii]+nx[ii], mem->RSQrq[ii], 0, 0);
+#else
         blasfeo_unpack_dmat(nu[ii]+nx[ii], nu[ii]+nx[ii], mem->RSQrq[ii], 0, 0, mem->reg_hess, nu[ii]+nx[ii]);
         acados_project(nu[ii]+nx[ii], mem->reg_hess, mem->V, mem->d, mem->e, opts->epsilon);
         blasfeo_pack_dmat(nu[ii]+nx[ii], nu[ii]+nx[ii], mem->reg_hess, nu[ii]+nx[ii], mem->RSQrq[ii], 0, 0);
+#endif
     }
 }
 

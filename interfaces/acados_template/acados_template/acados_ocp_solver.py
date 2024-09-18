@@ -127,7 +127,7 @@ class AcadosOcpSolver:
 
 
     @classmethod
-    def build(cls, code_export_dir, with_cython=False, cmake_builder: CMakeBuilder = None, verbose: bool = True):
+    def build(cls, code_export_dir, with_cython=False, cmake_builder: CMakeBuilder = None, verbose: bool = True, parallel: bool = True):
         """
         Builds the code for an acados OCP solver, that has been generated in code_export_dir
             :param code_export_dir: directory in which acados OCP solver has been generated, see generate()
@@ -148,13 +148,13 @@ class AcadosOcpSolver:
 
         if with_cython:
             verbose_system_call([make_cmd, 'clean_all'], verbose)
-            verbose_system_call([make_cmd, 'ocp_cython'], verbose)
+            verbose_system_call([make_cmd, 'ocp_cython', f'-j{os.cpu_count()}'], verbose)
         else:
             if cmake_builder is not None:
                 cmake_builder.exec(code_export_dir, verbose)
             else:
                 verbose_system_call([make_cmd, 'clean_ocp_shared_lib'], verbose)
-                verbose_system_call([make_cmd, 'ocp_shared_lib'], verbose)
+                verbose_system_call([make_cmd, 'ocp_shared_lib', f'-j{os.cpu_count()}'], verbose)
         os.chdir(cwd)
 
 
